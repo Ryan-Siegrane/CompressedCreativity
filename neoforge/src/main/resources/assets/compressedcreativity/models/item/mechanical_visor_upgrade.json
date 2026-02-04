@@ -1,0 +1,7 @@
+{
+  "textures" : {
+    "layer0" : "compressedcreativity:item/brass_coated_upgrade_matrix",
+    "layer1" : "compressedcreativity:item/mechanical_visor_upgrade"
+  },
+  "parent" : "item/generated"
+}

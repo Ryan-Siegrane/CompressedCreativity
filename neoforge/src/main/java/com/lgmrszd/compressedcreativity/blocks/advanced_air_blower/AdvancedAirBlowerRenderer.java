@@ -1,0 +1,54 @@
+package com.lgmrszd.compressedcreativity.blocks.advanced_air_blower;
+
+import com.lgmrszd.compressedcreativity.content.Mesh;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.simibubi.create.foundation.blockEntity.renderer.SafeBlockEntityRenderer;
+import dev.engine_room.flywheel.lib.model.baked.PartialModel;
+import net.createmod.catnip.render.CachedBuffers;
+import net.createmod.catnip.render.SuperByteBuffer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+
+import java.util.Optional;
+
+/**
+ * Renderer for the Advanced (Industrial) Air Blower block entity.
+ * Handles rendering of mesh overlays with proper tinting.
+ */
+public class AdvancedAirBlowerRenderer extends SafeBlockEntityRenderer<AdvancedAirBlowerBlockEntity> {
+    
+    public AdvancedAirBlowerRenderer(BlockEntityRendererProvider.Context context) {
+    }
+
+    @Override
+    protected void renderSafe(AdvancedAirBlowerBlockEntity te, float partialTicks, PoseStack ms, MultiBufferSource buffer, int light, int overlay) {
+        VertexConsumer vb = buffer.getBuffer(RenderType.translucent());
+
+        BlockState blockState = te.getBlockState();
+        Direction facing = blockState.getValue(AdvancedAirBlowerBlock.FACING);
+
+        Mesh.IMeshType meshType = te.getMeshType();
+        if (meshType == null) return;
+        
+        Optional<PartialModel> meshPartial = meshType.getModel();
+        meshPartial.ifPresent((meshModel) -> {
+            SuperByteBuffer mesh = CachedBuffers.partialFacing(meshModel, blockState, facing.getOpposite());
+            if (meshType.shouldTint()) {
+                mesh.color(meshType.getTintColor(te));
+            }
+            mesh.light(light);
+            mesh.renderInto(ms, vb);
+        });
+        
+        Optional<PartialModel> meshPartialExtra = meshType.getModelExtra();
+        meshPartialExtra.ifPresent((meshModelExtra) -> {
+            SuperByteBuffer mesh = CachedBuffers.partialFacing(meshModelExtra, blockState, facing.getOpposite());
+            mesh.light(light);
+            mesh.renderInto(ms, vb);
+        });
+    }
+}

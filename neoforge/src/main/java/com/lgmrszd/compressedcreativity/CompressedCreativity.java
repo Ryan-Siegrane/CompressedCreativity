@@ -1,0 +1,120 @@
+package com.lgmrszd.compressedcreativity;
+
+import com.lgmrszd.compressedcreativity.blocks.common.IPneumaticTileEntity;
+import com.lgmrszd.compressedcreativity.index.*;
+import com.lgmrszd.compressedcreativity.network.CCNetwork;
+import com.simibubi.create.foundation.data.CreateRegistrate;
+import me.desht.pneumaticcraft.api.PNCCapabilities;
+import net.minecraft.core.Direction;
+import net.minecraft.data.DataGenerator;
+import net.minecraft.data.PackOutput;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.*;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.data.event.GatherDataEvent;
+import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+/**
+ * Compressed Creativity - A bridge between Create and PneumaticCraft: Repressurized
+ * 
+ * This mod adds machines that convert between rotational force (Create) and 
+ * compressed air (PneumaticCraft), along with various utility blocks and items.
+ */
+@Mod(CompressedCreativity.MOD_ID)
+public class CompressedCreativity {
+    
+    public static final Logger LOGGER = LogManager.getLogger();
+    public static final String MOD_ID = "compressedcreativity";
+    public static final CreateRegistrate REGISTRATE = CreateRegistrate.create(MOD_ID);
+
+    public CompressedCreativity(IEventBus modEventBus, ModContainer modContainer) {
+        REGISTRATE.registerEventListeners(modEventBus);
+
+        CCConfigHelper.init();
+        CCConfigHelper.registerConfigListener(modEventBus);
+        
+        modEventBus.addListener(this::setup);
+        modEventBus.addListener(this::doClientStuff);
+        modEventBus.addListener(this::postInit);
+        modEventBus.addListener(this::registerCapabilities);
+        modEventBus.addListener(CCNetwork::register);
+        modEventBus.addListener(EventPriority.LOWEST, CompressedCreativity::gatherData);
+        
+        // Client-side initialization
+        if (net.neoforged.fml.loading.FMLEnvironment.dist == Dist.CLIENT) {
+            CCBlockPartials.init();
+        }
+
+        NeoForge.EVENT_BUS.addListener(this::serverStart);
+
+        CCCreativeTabs.register(modEventBus);
+        CCItems.register(modEventBus);
+        CCBlocks.register();
+        CCBlockEntities.register();
+    }
+
+    private void setup(final FMLCommonSetupEvent event) {
+        CCCommonSetup.init(event);
+    }
+
+    private void doClientStuff(final FMLClientSetupEvent event) {
+        CCClientSetup.init(event);
+    }
+
+    private void serverStart(final ServerAboutToStartEvent event) {
+        // Reserved for server-specific initialization
+    }
+
+    private void postInit(final FMLLoadCompleteEvent event) {
+        // Reserved for post-initialization tasks
+    }
+
+    private void registerCapabilities(RegisterCapabilitiesEvent event) {
+        LOGGER.info("Registering PneumaticCraft air handler capabilities for CompressedCreativity blocks");
+        
+        // Register air handler capability for all IPneumaticTileEntity block entities
+        event.registerBlockEntity(PNCCapabilities.AIR_HANDLER_MACHINE, CCBlockEntities.ROTATIONAL_COMPRESSOR.get(), 
+            (be, side) -> {
+                if (be instanceof IPneumaticTileEntity pneumatic) {
+                    return pneumatic.getAirHandler(side);
+                }
+                return null;
+            });
+        
+        event.registerBlockEntity(PNCCapabilities.AIR_HANDLER_MACHINE, CCBlockEntities.COMPRESSED_AIR_ENGINE.get(), 
+            (be, side) -> {
+                if (be instanceof IPneumaticTileEntity pneumatic) {
+                    return pneumatic.getAirHandler(side);
+                }
+                return null;
+            });
+        
+        event.registerBlockEntity(PNCCapabilities.AIR_HANDLER_MACHINE, CCBlockEntities.AIR_BLOWER.get(), 
+            (be, side) -> {
+                if (be instanceof IPneumaticTileEntity pneumatic) {
+                    return pneumatic.getAirHandler(side);
+                }
+                return null;
+            });
+        
+        event.registerBlockEntity(PNCCapabilities.AIR_HANDLER_MACHINE, CCBlockEntities.INDUSTRIAL_AIR_BLOWER.get(), 
+            (be, side) -> {
+                if (be instanceof IPneumaticTileEntity pneumatic) {
+                    return pneumatic.getAirHandler(side);
+                }
+                return null;
+            });
+    }
+
+    public static void gatherData(GatherDataEvent event) {
+        // Language overrides are provided in resources/assets/compressedcreativity/lang/overrides/
+        // No data generation needed for language files
+    }
+}

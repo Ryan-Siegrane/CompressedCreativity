@@ -1,0 +1,23 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDirs = ['src/main/resources', 'src/generated/resources']
+        }
+    }
+}
+
+// Common module only contains truly shared code (config, network packets, indices)
+// No Minecraft or platform dependencies needed
+dependencies {
+    // Empty - common code should not depend on Minecraft classes
+}

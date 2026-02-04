@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "package": "com.lgmrszd.compressedcreativity.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "mixins.compressedcreativity.refmap.json",
+  "mixins": [
+    "create.AirCurrentMixin",
+    "create.BackTankUtilMixin",
+    "create.BracketBlockMixin",
+    "create.ChuteBlockEntityMixin"
+  ],
+  "client": [
+    "create.BackTankUtilMixinClient"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "minVersion": "0.8"
+}

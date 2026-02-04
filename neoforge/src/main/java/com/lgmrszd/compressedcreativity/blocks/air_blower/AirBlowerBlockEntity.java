@@ -1,0 +1,323 @@
+package com.lgmrszd.compressedcreativity.blocks.air_blower;
+
+import com.lgmrszd.compressedcreativity.blocks.common.IPneumaticTileEntity;
+import com.lgmrszd.compressedcreativity.config.CommonConfig;
+import com.lgmrszd.compressedcreativity.config.PressureTierConfig;
+import com.lgmrszd.compressedcreativity.index.CCLang;
+import com.lgmrszd.compressedcreativity.network.IObserveTileEntity;
+import com.lgmrszd.compressedcreativity.network.ObservePacket;
+import com.simibubi.create.api.equipment.goggles.IHaveHoveringInformation;
+import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
+import com.simibubi.create.content.kinetics.fan.AirCurrent;
+import com.simibubi.create.content.kinetics.fan.IAirCurrentSource;
+import com.simibubi.create.content.logistics.chute.ChuteBlockEntity;
+import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
+import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import com.simibubi.create.infrastructure.config.AllConfigs;
+import me.desht.pneumaticcraft.api.PNCCapabilities;
+import me.desht.pneumaticcraft.api.PneumaticRegistry;
+import me.desht.pneumaticcraft.api.pressure.PressureTier;
+import me.desht.pneumaticcraft.api.tileentity.IAirHandlerMachine;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.core.Direction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.world.level.Level;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
+
+public class AirBlowerBlockEntity extends SmartBlockEntity implements IHaveHoveringInformation, IHaveGoggleInformation, IObserveTileEntity, IAirCurrentSource, IPneumaticTileEntity {
+
+
+    public AirCurrent airCurrent;
+    protected int entitySearchCooldown;
+    protected int airCurrentUpdateCooldown;
+    protected boolean updateAirFlow;
+//    protected boolean isWorking;
+
+    protected final IAirHandlerMachine airHandler;
+
+    private float airBuffer;
+    private float airUsage = 0.0f;
+
+    private float processingStatus = 0.0f;
+//            processing_speed = 0.0f;
+
+    public AirBlowerBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
+        this(
+                type,
+                pos,
+                state,
+                PressureTierConfig.CustomTier.AIR_BLOWER_TIER,
+                CommonConfig.AIR_BLOWER_VOLUME.get()
+        );
+    }
+
+    protected AirBlowerBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state, PressureTier pressureTier, int volume) {
+        super(type, pos, state);
+        airHandler = PneumaticRegistry.getInstance().getAirHandlerMachineFactory()
+                .createAirHandler(pressureTier, volume);
+
+        airCurrent = new AirCurrent(this);
+        updateAirFlow = true;
+
+    }
+
+    @Override
+    public void addBehaviours(List<BlockEntityBehaviour> behaviours) {
+
+    }
+
+    public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking){
+        ObservePacket.send(worldPosition, 0);
+        // "Pressure Stats:"
+        CCLang.translate("tooltip.pressure_summary")
+                .forGoggles(tooltip);
+
+        // "Pressure:"
+        CCLang.translate("tooltip.pressure")
+                .style(ChatFormatting.GRAY)
+                .forGoggles(tooltip);
+        // "0.0bar"
+        CCLang.number(airHandler.getPressure())
+                .translate("unit.bar")
+                .style(ChatFormatting.AQUA)
+                .forGoggles(tooltip, 1);
+        // "Air:"
+        CCLang.translate("tooltip.air")
+                .style(ChatFormatting.GRAY)
+                .forGoggles(tooltip);
+        // "0.0mL"
+        CCLang.number(airHandler.getAir())
+                .translate("unit.air")
+                .style(ChatFormatting.AQUA)
+                .forGoggles(tooltip, 1);
+//        if (airHandler.getPressure() <= CommonConfig.AIR_BLOWER_WORK_PRESSURE.get()) {
+//            return true;
+//        }
+        float speed = calculateProcessingSpeed();
+        if (speed > 0 && airCurrent.maxDistance > 0)
+        {
+            // "Air usage:"
+            CCLang.translate("tooltip.air_usage")
+                    .style(ChatFormatting.GRAY)
+                    .forGoggles(tooltip);
+            // "0.0mL/t"
+            CCLang.number(airUsage)
+                    .translate("unit.air_per_tick")
+                    .style(ChatFormatting.AQUA)
+                    .forGoggles(tooltip, 1);
+            CCLang.translate("tooltip.processing_speed_multiplier")
+                    .style(ChatFormatting.GRAY)
+                    .add(
+                            CCLang.number(speed)
+                                    .style(ChatFormatting.AQUA)
+                    )
+                    .forGoggles(tooltip);
+        }
+        return true;
+    }
+
+
+    protected float calculateAirUsage() {
+        return Math.max(1f, (float) Math.floor(airHandler.getPressure() * CommonConfig.AIR_BLOWER_AIR_USAGE_PER_BAR.get().floatValue() * 100) / 100);
+//        return (float) Math.floor((double) airHandler.getPressure() * 10) / 10 * CommonConfig.AIR_BLOWER_AIR_USAGE_PER_BAR.get().floatValue();
+    }
+
+    protected float calculateProcessingSpeed() {
+        float pressure = airHandler.getPressure();
+        if (pressure < 1) {
+            float x = pressure - 1;
+            return (1 - x*x*x*x);
+        } else if (pressure < 3.9) {
+            float x = (pressure - 1) / 3.9f;
+            return 1 + x*x;
+        } else return 2;
+    }
+
+    public void updateAirHandler() {
+        ArrayList<Direction> sides = new ArrayList<>();
+        for (Direction side: new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.UP, Direction.DOWN}) {
+            if (canConnectPneumatic(side)) {
+                sides.add(side);
+            }
+        }
+        airHandler.setConnectableFaces(sides);
+    }
+
+
+    @Override
+    public void tick() {
+        super.tick();
+        airHandler.tick(this);
+
+        boolean server = (level != null && !level.isClientSide) || isVirtual();
+
+        airUsage = calculateAirUsage();
+
+        if (server) {
+            if (airCurrentUpdateCooldown-- <= 0) {
+                airCurrentUpdateCooldown = AllConfigs.server().kinetics.fanBlockCheckRate.get();
+                updateAirFlow = true;
+            }
+
+
+            if (airHandler.getPressure() > 0 && airCurrent.maxDistance > 0) {
+                airBuffer += airUsage;
+                if (airBuffer > 1f) {
+                    int toRemove = Math.min((int) airBuffer, airHandler.getAir());
+                    airHandler.addAir(-toRemove);
+                    airBuffer -= toRemove;
+                }
+            }
+        }
+
+        if (updateAirFlow) {
+            updateAirFlow = false;
+            airCurrent.rebuild();
+            updateChute();
+            sendData();
+        }
+
+        if (airHandler.getPressure() <= 0) {
+            return;
+        }
+
+        if (entitySearchCooldown-- <= 0) {
+            entitySearchCooldown = 5;
+            airCurrent.findEntities();
+        }
+
+        if (airHandler.getPressure() > 0 && airCurrent.maxDistance > 0) {
+            processingStatus += calculateProcessingSpeed();
+            if (Math.floor(processingStatus) > 1) {
+                int air_ticks = (int) Math.floor(processingStatus);
+                for (int i = air_ticks; i > 0; i--) {
+                    airCurrent.tick();
+                }
+                processingStatus -= air_ticks;
+            }
+        }
+    }
+
+    @Override
+    public void initialize() {
+        super.initialize();
+        this.updateAirHandler();
+    }
+
+    @Override
+    public void invalidate() {
+        super.invalidate();
+        // NeoForge 1.21: LazyOptional capabilities removed - no airHandlerCap.invalidate() needed
+    }
+
+    @Override
+    public void remove() {
+        super.remove();
+        updateChute();
+    }
+
+    public void updateChute() {
+        Direction direction = getBlockState().getValue(AirBlowerBlock.FACING);
+        if (!direction.getAxis()
+                .isVertical())
+            return;
+        BlockEntity poweredChute = level.getBlockEntity(worldPosition.relative(direction));
+        if (!(poweredChute instanceof ChuteBlockEntity chuteBE))
+            return;
+        if (direction == Direction.DOWN)
+            chuteBE.updatePull();
+        else
+            chuteBE.updatePush(1);
+    }
+
+    // Capability system removed in NeoForge 1.21 - needs refactoring to new API
+    public IAirHandlerMachine getAirHandler(Direction side) {
+        if (canConnectPneumatic(side)) {
+            return airHandler;
+        }
+        return null;
+    }
+
+
+    public boolean canConnectPneumatic(Direction dir) {
+        Direction orientation = getBlockState().getValue(AirBlowerBlock.FACING);
+        return dir != orientation;
+    }
+
+    @Override
+    public void write(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
+        super.write(compound, registries, clientPacket);
+        compound.put("AirHandler", airHandler.serializeNBT());
+    }
+
+    @Override
+    protected void read(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
+        super.read(compound, registries, clientPacket);
+        airHandler.deserializeNBT(compound.getCompound("AirHandler"));
+        if (clientPacket)
+            airCurrent.rebuild();
+    }
+
+    @Nullable
+    @Override
+    public AirCurrent getAirCurrent() {
+        return airCurrent;
+    }
+
+    @Nullable
+    @Override
+    public Level getAirCurrentWorld() {
+        return level;
+    }
+
+    @Nonnull
+    @Override
+    public BlockPos getAirCurrentPos() {
+        return worldPosition;
+    }
+
+    @Override
+    public float getSpeed() {
+        float speed = 256f * airHandler.getPressure() / airHandler.getDangerPressure();
+        return (float) (Math.ceil(speed / 8) * 8);
+    }
+
+    @Override
+    public float getMaxDistance() {
+        float speed = Math.abs(this.getSpeed());
+        float distanceFactor = Math.min(speed / 256f, 1);
+        return Mth.lerp(distanceFactor, 3, 12);
+    }
+
+    @Nonnull
+    @Override
+    public Direction getAirflowOriginSide() {
+        return this.getBlockState().getValue(AirBlowerBlock.FACING);
+    }
+
+    @Nullable
+    @Override
+    public Direction getAirFlowDirection() {
+        return getBlockState().getValue(AirBlowerBlock.FACING);
+    }
+
+    @Override
+    public boolean isSourceRemoved() {
+        return remove;
+    }
+
+    @Override
+    public float getDangerPressure() {
+        return airHandler.getDangerPressure();
+    }
+}

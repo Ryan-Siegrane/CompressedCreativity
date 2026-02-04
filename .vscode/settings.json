@@ -1,0 +1,15 @@
+{
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "terminal.integrated.profiles.windows": {
+    "Command Prompt": {
+      "path": "C:\\Windows\\System32\\cmd.exe"
+    },
+    "PowerShell": {
+      "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+    }
+  },
+  "gradle.useCommandLine": true,
+  "gradle.command": "C:\\Users\\ryan2\\Desktop\\CompressedCreativity\\gradlew.bat",
+  "gradle.buildServer.enabled": false,
+  "java.import.gradle.buildServer.enabled": false
+}
